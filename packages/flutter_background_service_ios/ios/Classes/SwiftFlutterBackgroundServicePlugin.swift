@@ -87,6 +87,7 @@ public class SwiftFlutterBackgroundServicePlugin: FlutterPluginAppLifeCycleDeleg
         let callbackHandle = defaults.object(forKey: "background_callback_handle") as? Int64
         if (callbackHandle == nil){
             print("Background handler is disabled")
+            task.setTaskCompleted(success: true)
             return
         }
         
