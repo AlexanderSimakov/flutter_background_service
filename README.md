@@ -298,6 +298,34 @@ import flutter_background_service_ios // add this
 }
 ```
 
+- If your app uses the UIScene lifecycle, Flutter registers plugins only after launch finishes. That is too late for `BGTaskScheduler`, which throws if a task is registered after launch. Register the task yourself in `application(_:didFinishLaunchingWithOptions:)`; the plugin then skips its own registration. Requires Flutter 3.38 or later.
+
+```swift
+import UIKit
+import Flutter
+import flutter_background_service_ios // add this
+
+@main
+@objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
+  override func application(
+    _ application: UIApplication,
+    didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
+  ) -> Bool {
+    /// Add these lines (the identifier line is optional)
+    SwiftFlutterBackgroundServicePlugin.taskIdentifier = "your.custom.task.identifier"
+    SwiftFlutterBackgroundServicePlugin.registerTaskIdentifier(
+      taskIdentifier: SwiftFlutterBackgroundServicePlugin.taskIdentifier
+    )
+
+    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+
+  func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
+    GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+  }
+}
+```
+
 ## Usage
 
 - Call `FlutterBackgroundService.configure()` to configure handler that will be executed by the Service.

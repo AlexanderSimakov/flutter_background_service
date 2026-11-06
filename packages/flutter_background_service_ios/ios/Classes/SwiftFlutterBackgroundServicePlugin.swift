@@ -3,7 +3,7 @@ import UIKit
 import AVKit
 import BackgroundTasks
 
-public class SwiftFlutterBackgroundServicePlugin: FlutterPluginAppLifeCycleDelegate, FlutterPlugin  {
+public class SwiftFlutterBackgroundServicePlugin: FlutterPluginAppLifeCycleDelegate, FlutterPlugin, FlutterSceneLifeCycleDelegate {
     public static var taskIdentifier = "dev.flutter.background.refresh"
     // For testing, run app, bring app to background to schedule the task
     // Pause debug in XCODE, then execute:
@@ -46,6 +46,12 @@ public class SwiftFlutterBackgroundServicePlugin: FlutterPluginAppLifeCycleDeleg
         if #available(iOS 13.0, *){
             SwiftFlutterBackgroundServicePlugin.scheduleAppRefresh()
         }
+    }
+
+    // Apps on the UIScene lifecycle don't receive applicationDidEnterBackground,
+    // so the refresh is scheduled from the scene event instead.
+    public func sceneDidEnterBackground(_ scene: UIScene) {
+        SwiftFlutterBackgroundServicePlugin.scheduleAppRefresh()
     }
     
     private static var taskRegistered = false
@@ -107,6 +113,7 @@ public class SwiftFlutterBackgroundServicePlugin: FlutterPluginAppLifeCycleDeleg
         
         registrar.addMethodCallDelegate(instance, channel: channel)
         registrar.addApplicationDelegate(instance)
+        registrar.addSceneDelegate(instance)
     }
     
     private func autoStart(isForeground: Bool) {
