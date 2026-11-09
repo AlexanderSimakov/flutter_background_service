@@ -3,7 +3,11 @@ import UIKit
 import AVKit
 import BackgroundTasks
 
-public class SwiftFlutterBackgroundServicePlugin: FlutterPluginAppLifeCycleDelegate, FlutterPlugin, FlutterSceneLifeCycleDelegate {
+// Kept so host apps that followed the README (e.g. setting
+// `SwiftFlutterBackgroundServicePlugin.taskIdentifier`) still compile.
+public typealias SwiftFlutterBackgroundServicePlugin = FlutterBackgroundServicePlugin
+
+public class FlutterBackgroundServicePlugin: FlutterPluginAppLifeCycleDelegate, FlutterPlugin, FlutterSceneLifeCycleDelegate {
     public static var taskIdentifier = "dev.flutter.background.refresh"
     // For testing, run app, bring app to background to schedule the task
     // Pause debug in XCODE, then execute:
@@ -36,7 +40,7 @@ public class SwiftFlutterBackgroundServicePlugin: FlutterPluginAppLifeCycleDeleg
     public override func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [AnyHashable : Any] = [:]) -> Bool {
         UIApplication.shared.setMinimumBackgroundFetchInterval(UIApplication.backgroundFetchIntervalMinimum)
         if #available(iOS 13.0, *) {
-            SwiftFlutterBackgroundServicePlugin.registerTaskIdentifier(taskIdentifier: SwiftFlutterBackgroundServicePlugin.taskIdentifier)
+            FlutterBackgroundServicePlugin.registerTaskIdentifier(taskIdentifier: FlutterBackgroundServicePlugin.taskIdentifier)
         }
         
         return true
@@ -44,14 +48,14 @@ public class SwiftFlutterBackgroundServicePlugin: FlutterPluginAppLifeCycleDeleg
     
     public func applicationDidEnterBackground(_ application: UIApplication) {
         if #available(iOS 13.0, *){
-            SwiftFlutterBackgroundServicePlugin.scheduleAppRefresh()
+            FlutterBackgroundServicePlugin.scheduleAppRefresh()
         }
     }
 
     // Apps on the UIScene lifecycle don't receive applicationDidEnterBackground,
     // so the refresh is scheduled from the scene event instead.
     public func sceneDidEnterBackground(_ scene: UIScene) {
-        SwiftFlutterBackgroundServicePlugin.scheduleAppRefresh()
+        FlutterBackgroundServicePlugin.scheduleAppRefresh()
     }
     
     private static var taskRegistered = false
@@ -68,12 +72,12 @@ public class SwiftFlutterBackgroundServicePlugin: FlutterPluginAppLifeCycleDeleg
     
     @available(iOS 13.0, *)
     private static func scheduleAppRefresh() {
-        let request = BGAppRefreshTaskRequest(identifier: SwiftFlutterBackgroundServicePlugin.taskIdentifier)
+        let request = BGAppRefreshTaskRequest(identifier: FlutterBackgroundServicePlugin.taskIdentifier)
        request.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60)
             
        do {
            // cancel old schedule
-           BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: SwiftFlutterBackgroundServicePlugin.taskIdentifier)
+           BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: FlutterBackgroundServicePlugin.taskIdentifier)
            
           try BGTaskScheduler.shared.submit(request)
        } catch {
@@ -109,14 +113,33 @@ public class SwiftFlutterBackgroundServicePlugin: FlutterPluginAppLifeCycleDeleg
             binaryMessenger: registrar.messenger(),
             codec: FlutterJSONMethodCodec())
         
-        let instance = SwiftFlutterBackgroundServicePlugin()
+        let instance = FlutterBackgroundServicePlugin()
         instance.mainChannel = channel
         
         registrar.addMethodCallDelegate(instance, channel: channel)
         registrar.addApplicationDelegate(instance)
         registrar.addSceneDelegate(instance)
     }
-    
+
+    // Registers the host app's plugins with a service engine. The host's
+    // GeneratedPluginRegistrant is not visible at compile time, so it is looked
+    // up and invoked through the Objective-C runtime.
+    @objc(registerEngine:)
+    public static func register(_ engine: FlutterEngine) {
+        guard let registrant = NSClassFromString("GeneratedPluginRegistrant") else {
+            return
+        }
+
+        let selector = NSSelectorFromString("registerWithRegistry:")
+        guard let method = class_getClassMethod(registrant, selector) else {
+            return
+        }
+
+        typealias RegisterWithRegistry = @convention(c) (AnyClass, Selector, AnyObject) -> Void
+        let registerWithRegistry = unsafeBitCast(method_getImplementation(method), to: RegisterWithRegistry.self)
+        registerWithRegistry(registrant, selector, engine)
+    }
+
     private func autoStart(isForeground: Bool) {
         let defaults = UserDefaults.standard
         let autoStart = defaults.bool(forKey: "auto_start")
